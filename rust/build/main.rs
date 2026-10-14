@@ -8,6 +8,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo::rerun-if-changed=build/main.rs");
     println!("cargo::rerun-if-changed=build/java.rs");
     println!("cargo::rerun-if-changed=build/protobufs.rs");
+    println!("cargo::rerun-if-changed=../proto");
     println!("cargo::rerun-if-changed=../java/patchbukkit/build/libs/patchbukkit.jar");
     println!("cargo::rerun-if-changed=resources/jassets/");
     env_logger::init();

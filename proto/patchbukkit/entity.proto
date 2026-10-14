@@ -242,8 +242,3 @@ message GetEntityUuidRequest {
 message GetEntityUuidResponse {
   patchbukkit.common.UUID uuid = 1;
 }
-
-message SendRawPacketRequest {
-  patchbukkit.common.UUID uuid = 1;
-  bytes payload = 2;
-}

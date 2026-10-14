@@ -16,12 +16,20 @@ pub struct PatchBukkitDirectories {
     pub paper_runtime: PathBuf,
 }
 
-pub fn get_base_directory(server: &Context) -> Result<PathBuf, String> {
-    let data_folder = std::path::absolute(server.get_data_folder())
+fn get_server_root(server: &Context) -> Result<PathBuf, String> {
+    let mut dir = std::path::absolute(server.get_data_folder())
         .map_err(|_| "Failed to get absolute directory from relative")?;
-    let server_root = data_folder
-        .parent()
-        .ok_or("Failed to determine server root from PatchBukkit data folder")?;
+    while let Some(parent) = dir.parent() {
+        if parent.join("pumpkin.toml").exists() || parent.join("plugins").is_dir() {
+            return Ok(parent.to_path_buf());
+        }
+        dir = parent.to_path_buf();
+    }
+    std::env::current_dir().map_err(|e| format!("Failed to get current dir: {e}"))
+}
+
+pub fn get_base_directory(server: &Context) -> Result<PathBuf, String> {
+    let server_root = get_server_root(server)?;
     Ok(server_root.join("patchbukkit"))
 }
 
@@ -29,11 +37,7 @@ pub fn setup_directories(
     server: &Context,
     plugins_dir_name: &str,
 ) -> Result<PatchBukkitDirectories, String> {
-    let data_folder = std::path::absolute(server.get_data_folder())
-        .map_err(|_| "Failed to get absolute directory from relative")?;
-    let server_root = data_folder
-        .parent()
-        .ok_or("Failed to determine server root from PatchBukkit data folder")?;
+    let server_root = get_server_root(server)?;
     let base = server_root.join("patchbukkit");
 
     let plugins = if Path::new(plugins_dir_name).is_absolute() {

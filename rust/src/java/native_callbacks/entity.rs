@@ -11,7 +11,7 @@ use crate::{
             GetEntityIdResponse, GetEntityUuidRequest, GetEntityUuidResponse,
             GetExperienceResponse, GetFoodLevelResponse, GetPlayerPoseStateResponse,
             KickPlayerRequest, PlayerConnectionInfoResponse, SendActionBarRequest,
-            SendBlockChangeRequest, SendGameEventRequest, SendRawPacketRequest,
+            SendBlockChangeRequest, SendGameEventRequest,
             SendResourcePackRequest, SendTitleRequest, SetCompassTargetRequest, SetCooldownRequest,
             SetDisplayNameRequest, SetEntityHealthRequest, SetEntityVelocityRequest,
             SetExhaustionRequest, SetExperienceRequest, SetFoodLevelRequest, SetOpRequest,
@@ -741,13 +741,6 @@ pub fn ffi_native_bridge_send_game_event_impl(request: SendGameEventRequest) -> 
             };
             player.send_client_packet(&packet).await;
         });
-    })
-}
-
-pub fn ffi_native_bridge_send_raw_packet_impl(request: SendRawPacketRequest) -> Option<()> {
-    let payload = bytes::Bytes::from(request.payload);
-    with_player(request.uuid.as_ref(), |player| {
-        player.client.try_enqueue_packet_data(payload);
     })
 }
 
