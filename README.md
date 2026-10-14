@@ -3,33 +3,33 @@
 A plugin for [PumpkinMC](https://pumpkinmc.org/) that adds support for [PaperMC](https://papermc.io/), [Spigot](https://www.spigotmc.org/), and [Bukkit](https://dev.bukkit.org/) plugins.
 
 > **Fork Info & Fixes Summary:**
-> Bản fork này chứa các bản sửa lỗi quan trọng (bugfixes) và tối ưu hóa tương thích cho PumpkinMC 0.2.0+ cũng như các môi trường phần cứng CPU thế hệ cũ (`x86-64-v2`).
+> This fork incorporates critical bugfixes and compatibility enhancements for running PatchBukkit on PumpkinMC 0.2.0+, as well as ensuring support for legacy CPU architectures (`x86-64-v2`).
 
 ---
 
-## 🛠️ Summary of Applied Fixes (Các lỗi đã khắc phục)
+## 🛠️ Summary of Applied Fixes
 
-### 1. Sửa lỗi nhận diện thư mục gốc Server (`get_server_root` trong `directories.rs`)
-* **Hiện tượng:** Trước đây hàm `directories::get_base_directory` sử dụng `server.get_data_folder().parent()`. Trong môi trường thực tế (như container Pterodactyl hoặc khi Pumpkin nạp đường dẫn tương đối), logic này dẫn đến việc thư mục `/patchbukkit/` bị sinh sai vị trí (bị ném vào `plugins/patchbukkit`) hoặc crash do không tìm được thư mục cha tuyệt đối.
-* **Khắc phục:** Viết lại hàm `get_server_root`, tự động dò ngược lên cây thư mục cha để tìm dấu hiệu nhận diện server root chuẩn (`pumpkin.toml` hoặc thư mục `plugins/`), đảm bảo thư mục `/patchbukkit/` và `/patchbukkit/patchbukkit-plugins/` luôn được tạo chính xác tại root của server.
+### 1. Fixed Server Root Directory Detection (`get_server_root` in `directories.rs`)
+* **Problem:** Originally, `directories::get_base_directory` relied on `server.get_data_folder().parent()`. In production environments (such as Pterodactyl container setups or when Pumpkin loads relative paths), this caused the `/patchbukkit/` folder to be generated in the wrong location (nested inside `plugins/patchbukkit`) or panicked due to failing to resolve the absolute parent directory.
+* **Resolution:** Re-implemented `get_server_root` to recursively traverse parent directories looking for standard server root indicators (`pumpkin.toml` or the `plugins/` directory). This guarantees that `/patchbukkit/` and `/patchbukkit/patchbukkit-plugins/` are always created directly in the true root of the server.
 
-### 2. Đồng bộ hóa Protobuf & Rust Native Callbacks (`proto/` & `native_callbacks/`)
-* **Hiện tượng:** Mã nguồn gốc bị lỗi không thể biên dịch do không đồng bộ giữa định nghĩa Protobuf và Rust callbacks với PumpkinMC API mới:
-  * `SendRawPacketRequest` gây lỗi `unresolved import` do phương thức `player.client.try_enqueue_packet_data` không còn tồn tại trong Pumpkin API.
-  * `SpawnWorldEntityRequest` trong `world.rs` truy cập các trường không tồn tại (`entity_uuid`, `entity_id`).
-* **Khắc phục:**
-  * Đồng bộ và làm sạch lại `bridge.proto`, `entity.proto` và `world.proto`.
-  * Loại bỏ các RPC / Callbacks không còn tương thích (`SendRawPacket`, `RemoveEntity`).
-  * Tự động sinh UUID hợp lệ (`uuid::Uuid::new_v4()`) khi khởi tạo entity trong world.
+### 2. Synchronized Protobuf Definitions & Rust Native Callbacks (`proto/` & `native_callbacks/`)
+* **Problem:** Upstream source had build-breaking mismatches between Protobuf definitions and the latest PumpkinMC 0.2.0+ API:
+  * `SendRawPacketRequest` caused an `unresolved import` error because `player.client.try_enqueue_packet_data` was removed in Pumpkin's API.
+  * `SpawnWorldEntityRequest` in `world.rs` attempted to access non-existent fields (`entity_uuid`, `entity_id`).
+* **Resolution:**
+  * Cleaned up and synchronized `bridge.proto`, `entity.proto`, and `world.proto`.
+  * Removed deprecated RPC endpoints and callbacks (`SendRawPacket`, `RemoveEntity`).
+  * Automatically generate a valid UUID (`uuid::Uuid::new_v4()`) when spawning entities in the world.
 
-### 3. Tối ưu hóa Cargo Build & Theo dõi thay đổi Proto (`Cargo.toml` & `build/main.rs`)
-* **Khắc phục:**
-  * Thiết lập `codegen-units = 1` trong profile `[profile.release]` để tối ưu hóa code generation và tương thích tốt nhất khi xuất thư viện chia sẻ FFI (`.so`).
-  * Bổ sung chỉ thị `cargo::rerun-if-changed=../proto` vào build script để Cargo tự động phát hiện và compile lại Rust code mỗi khi có chỉnh sửa trong thư mục proto.
+### 3. Optimized Cargo Build Profile & Proto Change Tracking (`Cargo.toml` & `build/main.rs`)
+* **Resolution:**
+  * Configured `codegen-units = 1` under `[profile.release]` to optimize code generation and provide cleaner FFI dynamic shared library (`.so`) link behavior.
+  * Added `cargo::rerun-if-changed=../proto` to `build/main.rs` so Cargo automatically detects and recompiles Protobuf changes without requiring manual rebuilds.
 
-### 4. Khắc phục lỗi Crash `SIGILL` trên CPU đời cũ (`x86-64-v2` Support)
-* **Hiện tượng:** Các bản build phát hành chính thức trên GitHub Actions của upstream mặc định nhắm vào tập lệnh `x86-64-v3` (AVX2/BMI2). Khi chạy trên các vi xử lý đời cũ hơn (chẳng hạn như Intel Core i3-3217U Ivy Bridge), tiến trình sẽ lập tức bị crash với tín hiệu lỗi phần cứng `SIGILL` (Illegal Instruction) ngay khi `dlopen`.
-* **Khắc phục:** Hỗ trợ biên dịch nhắm vào kiến trúc `x86-64-v2` tương thích rộng rãi:
+### 4. Resolved Hardware `SIGILL` Crash on Legacy CPUs (`x86-64-v2` Support)
+* **Problem:** Upstream CI/CD releases target `x86-64-v3` (requiring AVX2/BMI2 instructions) by default. When deployed on older hardware (such as 3rd-generation Intel Core i3-3217U Ivy Bridge CPUs), the binary crashed immediately with a hardware `SIGILL` (Illegal Instruction) signal upon `dlopen`.
+* **Resolution:** Provided cross-compilation instructions and flags targeting `x86-64-v2` for maximum hardware compatibility:
   ```bash
   RUSTFLAGS="-C target-cpu=x86-64-v2" cargo zigbuild --target x86_64-unknown-linux-gnu.2.31 --release
   ```
